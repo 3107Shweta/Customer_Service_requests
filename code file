@@ -1,0 +1,166 @@
+## Customer Service Requests Analysis.
+Course-end Project 1
+
+DESCRIPTION
+
+You've been asked to perform data analysis of service request (311) calls from New York City. You've also been asked to utilize data wrangling techniques to understand the pattern in the data and visualize the major types of complaints.
+
+ 
+
+Note: Download 311-service-requests-nyc.zip file using the link given in the Customer Service Requests Analysis project problem statement and extract the 311_Service_Requests_from_2010_to_Present.csv file
+
+ 
+
+Perform the following steps:
+
+1. Understand the dataset:
+* Identify the shape of the dataset
+* Identify variables with null values
+
+2. Perform basic data exploratory analysis:
+* Utilize missing value treatment
+* Analyze the date column and remove the entries if it has an incorrect timeline
+* Draw a frequency plot for city-wise complaints
+* Draw scatter and hexbin plots for complaint concentration across Brooklyn
+
+3. Find major types of complaints:
+* Plot a bar graph of count vs. complaint types
+* Find the top 10 types of complaints
+* Display the types of complaints in each city in a separate dataset
+ 
+
+4. Visualize the major types of complaints in each city
+
+5. Check if the average response time across various types of complaints
+
+6. Identify significant variables by performing a statistical analysis using p-values and chi-square values (Optional)
+
+
+
+-----Solution----
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+df_NYC_dataset = pd.read_csv("311_Service_Requests_from_2010_to_Present.csv") 
+df_NYC_dataset.head()
+df_NYC_dataset.shape
+df_NYC_dataset.columns
+df_NYC_dataset.isnull()
+df_NYC_dataset.isnull().sum()
+#Creating the new column that consist the amount of time taken to resolve the complaint
+
+df_NYC_dataset["Request_Closing_time"]=(df_NYC_dataset["Closed Date"]-df_NYC_dataset["Created Date"])
+
+Request_Closing_time=[]
+for x in (df_NYC_dataset["Closed Date"]-df_NYC_dataset["Created Date"]):
+    close=x.total_seconds()/60
+    Request_Closing_time.append(close)
+    
+df_NYC_dataset["Request_Closing_time"]= Request_Closing_time
+#Univariate Distribution Plot for Request Closing Time
+
+sns.displot(df_NYC_dataset["Request_Closing_time"])
+plt.show
+# Check if the average response time across various types of complaints
+
+print("Total Number of Concerns : ",len(df_NYC_dataset),"\n")
+print("Percentage of Requests took less than 100 hour to get solved : ",round((len(df_NYC_dataset)-
+                            (df_NYC_dataset["Request_Closing_time"]>100).sum())/len(df_NYC_dataset)*100,2),"%")
+print("Percentage of Requests took less than 1000 hour to get solved : ",round((len(df_NYC_dataset)-
+                (df_NYC_dataset["Request_Closing_time"]>1000).sum())/len(df_NYC_dataset)*100,2),"%")
+# Count plot to understand the type of the complaint raised
+
+df_NYC_dataset['Complaint Type'].value_counts()[:10].plot(kind='barh',alpha=0.6,figsize=(15,10))
+plt.show()
+
+#Complaint type Breakdown with bar plot to figure out majority
+#of complaint types and top 10 complaints
+
+df_NYC_dataset['Complaint Type'].value_counts().plot(kind='bar',alpha = 0.6,figsize=(6,4))
+#Have a look at the status of tickets
+
+df_NYC_dataset['Status'].value_counts().plot(kind='bar',alpha= 0.6,figsize=(7,7))
+#Group dataset by complaint type to display plot against city
+
+groupedby_complainttype = df_NYC_dataset.groupby('Complaint Type')
+#fix blank values in City column
+
+df_NYC_dataset['City'].dropna(inplace=True)
+#Shape after dropping nan values
+
+df_NYC_dataset['City'].shape
+#Categorical Scatter Plot to understand which type of complaints are taking more time to get resolved
+
+g = sns.catplot(x='Complaint Type', y ='Request_Closing_time',data=df_NYC_dataset)
+g.fig.set_figwidth(15)
+g.fig.set_figheight(7)
+plt.xticks(rotation=90)
+plt.ylim((0,5000))
+plt.show()
+#Remove the column with very high percentage of missing value
+
+new_df=df_NYC_dataset.loc[:,(df_NYC_dataset.isnull().sum()/df_NYC_dataset.shape[0]*100)<=50]
+print("Old Dataframe Shape : ",df_NYC_dataset.shape)
+print("New Dataframe Shape : ",new_df.shape)
+rem=[]
+for x in new_df.columns.tolist():
+    if new_df[x].nunique()<=3:
+        print(x+ " "*10+" : ",new_df[x].unique())
+        rem.append(x)
+
+new_df.drop(rem,axis=1,inplace=True)
+
+new_df.shape
+
+#Remove columns that are not needed for our analysis
+rem1=["Unique Key","Incident Address","Descriptor","Street Name",
+      "Cross Street 1","Cross Street 2","Due Date","Resolution Description",
+      "Resolution Action Updated Date","Community Board","X Coordinate (State Plane)",
+      "Y Coordinate (State Plane)","Park Borough","Latitude","Longitude","Location"]
+
+new_df.drop(rem1,axis=1,inplace=True)
+
+new_df.head()
+## Hypothesis Testing
+g=sns.catplot(x="Complaint Type",y="Request_Closing_time",kind="box",data=new_df)
+g.fig.set_figheight(8)
+g.fig.set_figwidth(15)
+plt.xticks(rotation=90)
+plt.ylim((0,2000))
+anova_df=pd.DataFrame()
+anova_df["Request_Closing_time"]=new_df["Request_Closing_time"]
+anova_df["Complaint"]=new_df["Complaint Type"]
+
+anova_df.dropna(inplace=True)
+anova_df.head()
+chi_sq=pd.DataFrame()
+chi_sq["Location Type"]=new_df["Location Type"]
+chi_sq["Complaint Type"]=new_df["Complaint Type"]
+
+chi_sq.dropna(inplace=True)
+
+data_crosstab = pd.crosstab( chi_sq["Location Type"],chi_sq["Complaint Type"])
+from scipy.stats import chi2_contingency
+stat, p, dof, expected = chi2_contingency(data_crosstab) 
+
+alpha = 0.05
+if p <= alpha: 
+    print('Dependent (reject H0)') 
+else: 
+    print('Independent (H0 holds true)') 
+Since p value for the chi square test is less than 0.05(LOS) we can conclude that Complaint Type 
+is dependent on Location Type i.e specific type of complaint is raised from specific places,
+
+
+## Conclusions
+* Maximum Complaints are raised in road and parking (vehicle) related sectors
+* On an average complains are closed in an span of 150 to 300 hours
+* Transport and Road related issues are taking more time to get resolved as number of these cases are quite high.
+* Number of cases from Borough goes as follows BROOKLYN > QUEENS > MANHATTAN > BRONX > STATEN ISLAND
+* Complaint Type are Depentent on Location Type.
+* Time taken for solving different complaint type are different
+
